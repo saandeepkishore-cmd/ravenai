@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Raven AI — Voice-first assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:rgba(0,0,0,0);}
+:root{
+  --bg:#0d0d12;--surf:#13131a;--surf2:#1c1c27;--surf3:#22222f;
+  --bdr:#2a2a3e;--acc:#e8b84b;--acc2:#7b6cf0;--txt:#e4e0d8;
+  --dim:#6b6880;--dim2:#9a96b0;--red:#e05252;--grn:#4ecb7a;--mic:#e05252;
+}
+html{height:100%;height:-webkit-fill-available;}
+body{
+  height:100%;height:-webkit-fill-available;
+  overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:'IBM Plex Sans',sans-serif;
+  position:fixed;width:100%;
+}
+#app{
+  display:flex;flex-direction:column;
+  width:100%;height:100vh;height:100dvh;
+  overflow:hidden;
+}
+/* OVERLAY */
+#sov{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:30;}
+#sov.on{display:block;}
+/* SIDEBAR */
+#sb{
+  position:fixed;top:0;left:0;bottom:0;width:min(280px,85vw);
+  background:var(--surf);border-right:1px solid var(--bdr);
+  display:flex;flex-direction:column;z-index:40;
+  transform:translateX(-100%);transition:transform 0.28s ease;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+#sb.on{transform:translateX(0);}
+.slogo{padding:18px 16px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.slogo-av{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--acc),#c8a030);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:16px;font-weight:900;color:#0d0d12;flex-shrink:0;}
+.sln{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:var(--txt);line-height:1.1;}
+.slsub{font-size:11px;color:var(--dim2);}
+.sstatus{padding:14px 16px;border-bottom:1px solid var(--bdr);flex-shrink:0;}
+.sstatus-label{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.sstatus-row{display:flex;align-items:center;gap:7px;}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--grn);flex-shrink:0;animation:blink 2.5s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.35}}
+.status-text{font-size:13px;color:var(--txt);font-weight:500;}
+.status-tip{font-size:11px;color:var(--dim2);line-height:1.6;margin-top:8px;}
+.sbtns{padding:10px 12px;display:flex;gap:6px;flex-shrink:0;}
+.sbtn{flex:1;padding:10px 6px;border:1px solid var(--bdr);background:var(--surf2);color:var(--txt);font-family:'IBM Plex Mono',monospace;font-size:10px;border-radius:8px;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+.sbtn.pri{background:var(--acc);color:#0d0d12;border-color:var(--acc);font-weight:700;}
+.shl{padding:8px 16px 4px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;flex-shrink:0;}
+#hist{flex:1;overflow-y:auto;padding:0 10px 8px;-webkit-overflow-scrolling:touch;}
+.hi{padding:10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;margin-bottom:2px;border:1px solid transparent;touch-action:manipulation;}
+.hi.act{background:var(--surf2);border-color:var(--bdr);}
+.hiname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--dim2);}
+.hi.act .hiname{color:var(--txt);}
+.hidel{font-size:13px;color:var(--red);padding:4px 6px;flex-shrink:0;opacity:0.6;}
+.svoices{padding:12px 16px;border-top:1px solid var(--bdr);flex-shrink:0;}
+.svoices-label{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+.voice-list{font-size:12px;color:var(--dim2);line-height:1.7;}
+.voice-list b{color:var(--txt);}
+.voice-note{font-size:10px;color:var(--dim);margin-top:4px;}
+.sfooter{padding:12px 16px;border-top:1px solid var(--bdr);font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);line-height:2;flex-shrink:0;}
+.sfooter b{color:var(--acc);}
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column;width:100%;min-height:0;overflow:hidden;}
+/* TOPBAR */
+#topbar{
+  display:flex;align-items:center;gap:7px;
+  padding:0 10px;
+  padding-top:env(safe-area-inset-top);
+  height:calc(52px + env(safe-area-inset-top));
+  background:var(--surf);border-bottom:1px solid var(--bdr);
+  flex-shrink:0;overflow:hidden;
+}
+#hbtn{width:40px;height:40px;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-radius:8px;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation;}
+.topbar-av{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--acc),#c8a030);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:13px;font-weight:900;color:#0d0d12;flex-shrink:0;}
+.topbar-info{flex:1;min-width:0;}
+.topbar-name{font-size:14px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar-sub{font-size:10px;color:var(--dim2);}
+#voicepicker{
+  background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 7px;
+  border-radius:8px;outline:none;cursor:pointer;
+  -webkit-appearance:none;appearance:none;
+  max-width:100px;flex-shrink:0;
+}
+#btn-new-top{
+  padding:7px 9px;background:transparent;border:1px solid var(--bdr);color:var(--dim2);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;
+  border-radius:8px;cursor:pointer;touch-action:manipulation;white-space:nowrap;flex-shrink:0;
+}
+/* MESSAGES */
+#msgs{
+  flex:1;overflow-y:auto;overflow-x:hidden;
+  padding:14px 12px;
+  display:flex;flex-direction:column;gap:13px;
+  -webkit-overflow-scrolling:touch;min-height:0;
+}
+.msg{display:flex;gap:8px;animation:up 0.22s ease;}
+@keyframes up{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.u{flex-direction:row-reverse;align-self:flex-end;max-width:88%;}
+.msg.b{align-self:flex-start;max-width:94%;}
+.av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:12px;font-weight:700;flex-shrink:0;margin-top:2px;}
+.msg.u .av{background:var(--acc2);color:#fff;}
+.msg.b .av{background:linear-gradient(135deg,var(--acc),#c8a030);color:#0d0d12;}
+.bub{padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.75;word-break:break-word;overflow-wrap:break-word;}
+.msg.u .bub{background:var(--acc2);color:#fff;border-bottom-right-radius:4px;}
+.msg.b .bub{background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);border-bottom-left-radius:4px;}
+.bub pre{background:#06060f;border:1px solid var(--bdr);border-radius:8px;padding:10px;overflow-x:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;margin:8px 0;line-height:1.6;}
+.bub code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:rgba(255,255,255,0.08);padding:2px 5px;border-radius:3px;}
+.bub pre code{background:none;padding:0;}
+.bub h1{font-family:'Playfair Display',serif;font-size:17px;color:var(--acc);margin:10px 0 4px;}
+.bub h2{font-family:'Playfair Display',serif;font-size:15px;color:var(--acc);margin:8px 0 3px;}
+.bub h3{font-size:13px;color:#c8c8ff;font-weight:600;margin:7px 0 2px;}
+.bub p{margin:4px 0;}.bub ul,.bub ol{margin:4px 0 4px 18px;}.bub li{margin:3px 0;}
+.bub strong{color:var(--acc);font-weight:600;}.bub em{color:#b0c0ff;}
+.tbl-wrap{overflow-x:auto;margin:10px 0;border-radius:8px;-webkit-overflow-scrolling:touch;}
+.tbl-wrap table{border-collapse:collapse;width:100%;font-size:12px;min-width:220px;}
+.tbl-wrap th{background:var(--acc);color:#0d0d12;padding:7px 10px;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;white-space:nowrap;}
+.tbl-wrap td{padding:6px 10px;border-bottom:1px solid var(--bdr);color:var(--txt);vertical-align:top;}
+.tbl-wrap tr:last-child td{border-bottom:none;}
+.voice-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--dim2);margin-top:5px;font-family:'IBM Plex Mono',monospace;padding:2px 7px;background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid var(--bdr);}
+.typing{display:flex;gap:4px;align-items:center;padding:4px 0;}
+.typing span{width:7px;height:7px;background:var(--acc);border-radius:50%;animation:bo 1.2s infinite;}
+.typing span:nth-child(2){animation-delay:0.2s}.typing span:nth-child(3){animation-delay:0.4s}
+@keyframes bo{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+/* WELCOME */
+#welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px 12px;gap:12px;}
+.wbadge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bdr);border-radius:20px;padding:5px 12px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2);}
+.wbadge-dot{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:pulse 2s infinite;flex-shrink:0;}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:0.7}}
+.wt{font-family:'Playfair Display',serif;font-size:clamp(28px,7.5vw,56px);font-weight:900;color:var(--txt);line-height:1.05;letter-spacing:-1px;}
+.wt .accent{color:var(--acc);}
+.wd{font-size:13px;color:var(--dim2);max-width:360px;line-height:1.7;}
+.wfeatures{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:480px;}
+.wfeat{background:var(--surf2);border:1px solid var(--bdr);border-radius:12px;padding:11px 13px;flex:1;min-width:110px;max-width:150px;text-align:left;}
+.wfeat-icon{font-size:17px;margin-bottom:5px;display:block;}
+.wfeat-title{font-size:12px;font-weight:600;color:var(--txt);margin-bottom:2px;}
+.wfeat-desc{font-size:10px;color:var(--dim2);line-height:1.5;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:380px;}
+.chip{background:var(--surf2);border:1px solid var(--bdr);color:var(--dim2);font-size:11px;padding:7px 11px;border-radius:20px;font-family:'IBM Plex Mono',monospace;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+.wc{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;}
+/* INPUT */
+#inputwrap{
+  padding:8px 10px;
+  padding-bottom:calc(8px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--bdr);
+  background:var(--surf);flex-shrink:0;
+}
+#voicestatus{display:none;padding:0 2px 6px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mic);align-items:center;gap:6px;}
+#voicestatus.show{display:flex;}
+.vs-dot{width:7px;height:7px;border-radius:50%;background:var(--mic);animation:blink 0.8s infinite;flex-shrink:0;}
+#vstext{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#prevarea{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px;}
+.pv{position:relative;display:inline-block;}
+.pvimg{width:50px;height:50px;object-fit:cover;border-radius:7px;border:1px solid var(--bdr);display:block;}
+.pvrm{position:absolute;top:-5px;right:-5px;width:18px;height:18px;background:var(--red);color:#fff;border:none;border-radius:50%;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+.irow{display:flex;gap:6px;align-items:flex-end;}
+#txt{
+  flex:1;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);
+  font-family:'IBM Plex Sans',sans-serif;font-size:16px;padding:11px 12px;
+  border-radius:10px;resize:none;outline:none;min-height:44px;max-height:110px;
+  line-height:1.5;-webkit-appearance:none;
+}
+#txt:focus{border-color:var(--acc);}
+#txt::placeholder{color:var(--dim);}
+.abtn{
+  width:44px;height:44px;background:var(--surf2);border:1px solid var(--bdr);
+  color:var(--dim2);border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;-webkit-appearance:none;appearance:none;
+}
+#micbtn{
+  width:44px;height:44px;background:var(--surf2);border:1px solid var(--bdr);
+  color:var(--dim2);border-radius:10px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;-webkit-appearance:none;appearance:none;
+  transition:all 0.2s;
+}
+#micbtn.recording{background:rgba(224,82,82,0.15);border-color:var(--mic);color:var(--mic);animation:micpulse 1.2s infinite;}
+@keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(224,82,82,0.4);}50%{box-shadow:0 0 0 8px rgba(224,82,82,0);}}
+#micbtn svg{width:20px;height:20px;}
+#sendbtn{
+  width:44px;height:44px;background:var(--acc);border:none;border-radius:10px;
+  color:#0d0d12;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;cursor:pointer;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;-webkit-appearance:none;appearance:none;
+}
+#sendbtn:disabled{opacity:0.4;}
+/* MODAL */
+.mov{position:fixed;inset:0;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px;}
+.mbox{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:22px;width:100%;max-width:340px;}
+.mbox h2{font-family:'Playfair Display',serif;color:var(--acc);font-size:19px;margin-bottom:6px;}
+.mbox p{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);margin-bottom:12px;line-height:1.6;}
+.mbox input{width:100%;background:var(--surf2);border:1px solid var(--bdr);color:var(--txt);font-family:'IBM Plex Sans',sans-serif;font-size:16px;padding:10px 12px;border-radius:7px;outline:none;margin-bottom:12px;-webkit-appearance:none;}
+.mbox input:focus{border-color:var(--acc);}
+.mbtns{display:flex;gap:8px;justify-content:flex-end;}
+/* TOAST */
+.toast{position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:12px;z-index:999;white-space:nowrap;max-width:90vw;text-align:center;animation:up 0.25s ease;}
+.toast.ok{background:var(--grn);color:#0d0d12;font-weight:700;}
+.toast.er{background:var(--red);color:#fff;}
+.toast.in{background:var(--surf2);color:var(--txt);border:1px solid var(--bdr);}
+/* KATEX */
+.katex{font-size:1.05em;}.katex-display{overflow-x:auto;padding:6px 0;margin:6px 0;}
+/* DESKTOP */
+@media(min-width:680px){
+  #app{flex-direction:row;}
+  #sov{display:none!important;}
+  #sb{position:relative;transform:none!important;width:270px;transition:none;}
+  #hbtn{display:none;}
+  .toast{bottom:24px;}
+  .msg.u{max-width:75%;}.msg.b{max-width:82%;}
+  #voicepicker{max-width:150px;font-size:11px;}
+}
+/* SCROLLBARS */
+#msgs::-webkit-scrollbar,#hist::-webkit-scrollbar{width:4px;}
+#msgs::-webkit-scrollbar-track,#hist::-webkit-scrollbar-track{background:transparent;}
+#msgs::-webkit-scrollbar-thumb,#hist::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:4px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sov"></div>
+  <!-- SIDEBAR -->
+  <div id="sb">
+    <div class="slogo">
+      <div class="slogo-av">R</div>
+      <div><div class="sln">Raven AI</div><div class="slsub">Voice-first assistant</div></div>
+    </div>
+    <div class="sstatus">
+      <div class="sstatus-label">Status</div>
+      <div class="sstatus-row"><div class="status-dot"></div><div class="status-text" id="statustext">Ready for voice</div></div>
+      <div class="status-tip">Tap the mic 🎙️, speak naturally, tap again to stop. Raven answers in text and voice.</div>
+    </div>
+    <div class="sbtns">
+      <button class="sbtn pri" id="btn-new">＋ New</button>
+      <button class="sbtn" id="btn-save">💾 Save</button>
+      <button class="sbtn" id="btn-clear">🗑 Clear</button>
+    </div>
+    <div class="shl">Conversations</div>
+    <div id="hist"></div>
+    <div class="svoices">
+      <div class="svoices-label">Voices</div>
+      <div class="voice-list" id="voicelist">Loading…</div>
+      <div class="voice-note">Pick a voice in the top bar.</div>
+    </div>
+    <div class="sfooter">Created by <b>Saandeep Kishore</b><br>Questions: <b>∞ Unlimited</b><br>Cost: <b>Always Free</b></div>
+  </div>
+  <!-- MAIN -->
+  <div id="main">
+    <div id="topbar">
+      <button id="hbtn">☰</button>
+      <div class="topbar-av">R</div>
+      <div class="topbar-info">
+        <div class="topbar-name" id="ctitle">Raven AI</div>
+        <div class="topbar-sub">Voice-first assistant</div>
+      </div>
+      <select id="voicepicker" title="Voice"></select>
+      <button id="btn-new-top">＋ New</button>
+    </div>
+    <div id="msgs">
+      <div id="welcome">
+        <div class="wbadge"><div class="wbadge-dot"></div>Voice-first chat · Powered by Groq</div>
+        <div class="wt">Speak. <span class="accent">Raven</span> answers.</div>
+        <div class="wd">A refined dark-mode voice assistant. Tap the mic, speak your question, and hear Raven respond in real time.</div>
+        <div class="wfeatures">
+          <div class="wfeat"><span class="wfeat-icon">〰️</span><div class="wfeat-title">Streaming</div><div class="wfeat-desc">Audio plays while text appears.</div></div>
+          <div class="wfeat"><span class="wfeat-icon">🔒</span><div class="wfeat-title">Reliable</div><div class="wfeat-desc">Works on all devices.</div></div>
+          <div class="wfeat"><span class="wfeat-icon">🎙️</span><div class="wfeat-title">Simple</div><div class="wfeat-desc">One mic. No clutter.</div></div>
+        </div>
+        <div class="chips">
+          <div class="chip" data-q="Solve step by step: integrate x cubed plus 2x">∫ Calculus</div>
+          <div class="chip" data-q="Explain quantum entanglement simply">⚛ Quantum</div>
+          <div class="chip" data-q="Write Python merge sort with explanation">🐍 Python</div>
+          <div class="chip" data-q="Main causes of World War I">📜 History</div>
+          <div class="chip" data-q="Explain the Riemann Hypothesis">π Riemann</div>
+          <div class="chip" data-q="Newton's 3 laws with real examples">🔭 Physics</div>
+        </div>
+        <div class="wc">Created by Saandeep Kishore · Powered by Groq</div>
+      </div>
+    </div>
+    <div id="inputwrap">
+      <div id="voicestatus"><div class="vs-dot"></div><span id="vstext">Listening…</span></div>
+      <div id="prevarea"></div>
+      <div class="irow">
+        <textarea id="txt" placeholder="Ask anything… or tap 🎙️" rows="1"></textarea>
+        <button class="abtn" id="imgbtn" title="Attach image">📎</button>
+        <button id="micbtn" title="Voice input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+        <button id="sendbtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="fileinp" accept="image/*" multiple>
+
+<script>
+window.onload = function(){
+
+var GROQ_KEY   = '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';
+var GROQ_URL   = 'https://api.groq.com/openai/v1/chat/completions';
+var GROQ_STT   = 'https://api.groq.com/openai/v1/audio/transcriptions';
+var GROQ_MODEL = 'llama-3.3-70b-versatile';
+var GROQ_VIS   = 'meta-llama/llama-4-scout-17b-16e-instruct';
+var SYS = 'You are Raven, a brilliantly intelligent AI voice assistant created by Saandeep Kishore. Expert in Mathematics, Physics, Chemistry, Biology, Programming, History, Logic. RULES: 1) If asked who created you, say \"I was created by Saandeep Kishore.\" 2) Step-by-step for maths/science. 3) Clean commented code. 4) Use markdown and tables. 5) Be thorough. 6) Respond in the user\'s language. 7) Use LaTeX for math: $...$ inline and $$...$$ block. 8) CHEMISTRY — CRITICAL: For ALL chemical formulas and equations you MUST use KaTeX mhchem syntax wrapped in dollar signs. For inline formulas use $\\ce{H2O}$ format. For full reaction equations use $$\\ce{2H2 + O2 -> 2H2O}$$ format. Examples: water is $\\ce{H2O}$, sulphuric acid is $\\ce{H2SO4}$, combustion of methane is $$\\ce{CH4 + 2O2 -> CO2 + 2H2O}$$, equilibrium is $$\\ce{N2 + 3H2 <=> 2NH3}$$. NEVER write chemical formulas as plain text like H2O or H2SO4 — always use $\\ce{}$ notation. 9) BIOLOGY: Use *Genus species* italics for scientific names. Use $\\ce{ATP}$, $\\ce{CO2}$, $\\ce{O2}$ etc for biological molecules. Use markdown tables to compare concepts. Use clear headings for processes.';;
+
+var convos={},curId=null,msgs=[],pend=[],busy=false;
+var isRecording=false,mediaRecorder=null,audioChunks=[];
+var speechSynth=window.speechSynthesis,voicesList=[],selectedVoice=null;
+
+// Detect platform
+var isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+var isIOS=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+var SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
+// Use Whisper (MediaRecorder) on mobile for reliability; Web Speech on desktop
+var useWhisper = isMobile || !SpeechRec;
+var recognition=null;
+
+try{convos=JSON.parse(localStorage.getItem('rv6')||'{}');}catch(e){}
+
+var elMsgs=document.getElementById('msgs');
+var elTxt=document.getElementById('txt');
+var elSend=document.getElementById('sendbtn');
+var elHist=document.getElementById('hist');
+var elTitle=document.getElementById('ctitle');
+var elPrev=document.getElementById('prevarea');
+var elFile=document.getElementById('fileinp');
+var elMic=document.getElementById('micbtn');
+var elVStat=document.getElementById('voicestatus');
+var elVSText=document.getElementById('vstext');
+var elVPicker=document.getElementById('voicepicker');
+var elStatus=document.getElementById('statustext');
+var elVList=document.getElementById('voicelist');
+
+// ── MOBILE HEIGHT FIX ────────────────────────────────────
+// visualViewport correctly handles keyboard popup shrinking the viewport
+function fixH(){
+  var h=window.visualViewport?window.visualViewport.height:window.innerHeight;
+  document.getElementById('app').style.height=h+'px';
+  document.getElementById('main').style.height=h+'px';
+}
+fixH();
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',fixH);
+  window.visualViewport.addEventListener('scroll',fixH);
+} else {
+  window.addEventListener('resize',fixH);
+}
+window.addEventListener('orientationchange',function(){setTimeout(fixH,400);});
+
+// Prevent body bounce on iOS (keep scrolling inside #msgs/#hist only)
+document.body.addEventListener('touchmove',function(e){
+  var t=e.target;
+  if(t.closest('#msgs')||t.closest('#hist')||t.closest('#sb')) return;
+  e.preventDefault();
+},{passive:false});
+
+// ── VOICE SYNTHESIS ─────────────────────────────────────
+var PREF=['Google UK English Female','Google US English','Samantha','Karen','Victoria','Moira','Daniel','Alex','Siri'];
+function loadVoices(){
+  var v=speechSynth.getVoices();
+  if(!v.length)return;
+  voicesList=v;
+  elVPicker.innerHTML='';
+  var added=[];
+  PREF.forEach(function(name){
+    var found=voicesList.find(function(x){return x.name===name;});
+    if(found){added.push(found.name);addOpt(found);}
+  });
+  voicesList.filter(function(vv){return vv.lang.startsWith('en')&&added.indexOf(vv.name)===-1;})
+    .slice(0,12).forEach(addOpt);
+  if(!elVPicker.options.length)voicesList.slice(0,8).forEach(addOpt);
+  var names=[];
+  for(var i=0;i<Math.min(elVPicker.options.length,5);i++)names.push(elVPicker.options[i].text.split(' ').slice(0,2).join(' '));
+  elVList.innerHTML=names.map(function(n){return '<b>'+n+'</b>';}).join(' · ');
+  selectVoice(elVPicker.value);
+}
+function addOpt(v){var o=document.createElement('option');o.value=v.name;o.textContent=v.name;elVPicker.appendChild(o);}
+speechSynth.onvoiceschanged=loadVoices;
+loadVoices();
+setTimeout(function(){if(!voicesList.length)loadVoices();},1000);
+elVPicker.onchange=function(){selectVoice(this.value);};
+function selectVoice(name){
+  selectedVoice=voicesList.find(function(v){return v.name===name;})||voicesList[0]||null;
+}
+
+function latexToSpeech(s){
+  s=s.trim();
+  for(var fi=0;fi<4;fi++){
+    s=s.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g,function(_,n,d){return latexToSpeech(n)+' over '+latexToSpeech(d);});
+  }
+  s=s.replace(/\\sqrt\[([^\]]+)\]\{([^{}]+)\}/g,function(_,n,x){return latexToSpeech(n)+' root of '+latexToSpeech(x);});
+  s=s.replace(/\\sqrt\{([^{}]+)\}/g,function(_,x){return 'square root of '+latexToSpeech(x);});
+  s=s.replace(/\^\{([^{}]+)\}/g,function(_,e){
+    e=e.trim();
+    if(e==='2')return ' squared';if(e==='3')return ' cubed';
+    if(e==='-1')return ' inverse';if(e==='T')return ' transpose';
+    return ' to the power of '+latexToSpeech(e);
+  });
+  s=s.replace(/\^(\w)/g,function(_,e){
+    if(e==='2')return ' squared';if(e==='3')return ' cubed';
+    if(e==='T')return ' transpose';return ' to the power of '+e;
+  });
+  s=s.replace(/\_\{([^{}]+)\}/g,function(_,sub){return ' sub '+latexToSpeech(sub);});
+  s=s.replace(/\_(\w)/g,function(_,sub){return ' sub '+sub;});
+  s=s.replace(/\\int_\{([^{}]+)\}\^\{([^{}]+)\}/g,function(_,a,b){return 'integral from '+latexToSpeech(a)+' to '+latexToSpeech(b)+' of ';});
+  s=s.replace(/\\int/g,'integral of ');
+  s=s.replace(/\\sum_\{([^{}]+)\}\^\{([^{}]+)\}/g,function(_,a,b){return 'sum from '+latexToSpeech(a)+' to '+latexToSpeech(b)+' of ';});
+  s=s.replace(/\\sum/g,'sum of ');
+  s=s.replace(/\\prod/g,'product of ');
+  s=s.replace(/\\lim_\{([^{}]+)\\to([^{}]+)\}/g,function(_,v,t){return 'limit as '+latexToSpeech(v)+' approaches '+latexToSpeech(t)+' of ';});
+  s=s.replace(/\\lim_\{([^{}]+)\}/g,function(_,x){return 'limit as '+latexToSpeech(x)+' of ';});
+  s=s.replace(/\\lim/g,'limit of ');
+  s=s.replace(/\\partial/g,'partial ');
+  s=s.replace(/\\Delta\s*([A-Za-z])/g,function(_,v){return 'change in '+v;});
+  s=s.replace(/\\Delta/g,'change in ');
+  s=s.replace(/\\nabla/g,'del ');
+  s=s.replace(/\\vec\{([^{}]+)\}/g,function(_,v){return 'vector '+latexToSpeech(v);});
+  s=s.replace(/\\vec\s*(\w)/g,function(_,v){return 'vector '+v;});
+  s=s.replace(/\\hat\{([^{}]+)\}/g,function(_,v){return 'unit vector '+latexToSpeech(v);});
+  s=s.replace(/\\dot\{([^{}]+)\}/g,function(_,v){return 'd '+latexToSpeech(v)+' by dt';});
+  s=s.replace(/\\ddot\{([^{}]+)\}/g,function(_,v){return 'd squared '+latexToSpeech(v)+' by dt squared';});
+  s=s.replace(/\\times/g,' cross ');
+  s=s.replace(/\\cdot/g,' dot ');
+  s=s.replace(/\\hbar/g,'h bar');
+  s=s.replace(/\\mu_0/g,'mu naught');
+  s=s.replace(/\\epsilon_0/g,'epsilon naught');
+  s=s.replace(/\\varepsilon_0/g,'epsilon naught');
+  s=s.replace(/\\sin\^\{([^{}]+)\}/g,function(_,e){return 'sine to the power of '+latexToSpeech(e);});
+  s=s.replace(/\\cos\^\{([^{}]+)\}/g,function(_,e){return 'cosine to the power of '+latexToSpeech(e);});
+  s=s.replace(/\\tan\^\{([^{}]+)\}/g,function(_,e){return 'tangent to the power of '+latexToSpeech(e);});
+  s=s.replace(/\\sin/g,'sine ').replace(/\\cos/g,'cosine ').replace(/\\tan/g,'tangent ');
+  s=s.replace(/\\arcsin/g,'arc sine ').replace(/\\arccos/g,'arc cosine ').replace(/\\arctan/g,'arc tangent ');
+  s=s.replace(/\\sec/g,'secant ').replace(/\\csc/g,'cosecant ').replace(/\\cot/g,'cotangent ');
+  s=s.replace(/\\log_\{([^{}]+)\}/g,function(_,b){return 'log base '+latexToSpeech(b)+' of ';});
+  s=s.replace(/\\log/g,'log ').replace(/\\ln/g,'natural log ');
+  s=s.replace(/\\exp/g,'e to the power of ');
+  s=s.replace(/\\pi/g,'pi').replace(/\\Pi/g,'Pi');
+  s=s.replace(/\\theta/g,'theta').replace(/\\Theta/g,'Theta');
+  s=s.replace(/\\alpha/g,'alpha').replace(/\\beta/g,'beta');
+  s=s.replace(/\\gamma/g,'gamma').replace(/\\Gamma/g,'Gamma');
+  s=s.replace(/\\delta/g,'delta').replace(/\\epsilon/g,'epsilon');
+  s=s.replace(/\\varepsilon/g,'epsilon').replace(/\\lambda/g,'lambda').replace(/\\Lambda/g,'Lambda');
+  s=s.replace(/\\mu/g,'mu').replace(/\\nu/g,'nu');
+  s=s.replace(/\\sigma/g,'sigma').replace(/\\Sigma/g,'Sigma');
+  s=s.replace(/\\omega/g,'omega').replace(/\\Omega/g,'Omega');
+  s=s.replace(/\\phi/g,'phi').replace(/\\Phi/g,'Phi');
+  s=s.replace(/\\psi/g,'psi').replace(/\\Psi/g,'Psi');
+  s=s.replace(/\\rho/g,'rho').replace(/\\eta/g,'eta');
+  s=s.replace(/\\xi/g,'xi').replace(/\\zeta/g,'zeta').replace(/\\tau/g,'tau');
+  s=s.replace(/\\kappa/g,'kappa').replace(/\\chi/g,'chi');
+  s=s.replace(/\\infty/g,'infinity');
+  s=s.replace(/\\pm/g,'plus or minus').replace(/\\mp/g,'minus or plus');
+  s=s.replace(/\\div/g,' divided by ');
+  s=s.replace(/\\leq/g,' less than or equal to ').replace(/\\geq/g,' greater than or equal to ');
+  s=s.replace(/\\le/g,' less than or equal to ').replace(/\\ge/g,' greater than or equal to ');
+  s=s.replace(/\\ll/g,' much less than ').replace(/\\gg/g,' much greater than ');
+  s=s.replace(/\\neq/g,' not equal to ').replace(/\\ne/g,' not equal to ');
+  s=s.replace(/\\approx/g,' approximately ').replace(/\\sim/g,' approximately ');
+  s=s.replace(/\\equiv/g,' is equivalent to ').replace(/\\propto/g,' is proportional to ');
+  s=s.replace(/\\rightarrow/g,' approaches ').replace(/\\to/g,' approaches ');
+  s=s.replace(/\\Rightarrow/g,' implies ');
+  s=s.replace(/\\therefore/g,'therefore ').replace(/\\because/g,'because ');
+  s=s.replace(/\\forall/g,'for all ').replace(/\\exists/g,'there exists ');
+  s=s.replace(/\\in/g,' in ').replace(/\\notin/g,' not in ');
+  s=s.replace(/\\left[\(\[{|]/g,' ').replace(/\\right[\)\]}|]/g,' ');
+  s=s.replace(/\\bigl?[\(\[{|]/g,' ').replace(/\\bigr?[\)\]}|]/g,' ');
+  s=s.replace(/\\[a-zA-Z]+\*/g,' ').replace(/\\[a-zA-Z]+/g,' ');
+  s=s.replace(/[{}\\]/g,' ');
+  s=s.replace(/\s{2,}/g,' ').trim();
+  return s;
+}
+function mathToSpeech(text){
+  text=text.replace(/\$\$([\s\S]+?)\$\$/g,function(_,m){return '. '+latexToSpeech(m)+'. ';});
+  text=text.replace(/\$([^$\n]+?)\$/g,function(_,m){return ' '+latexToSpeech(m)+' ';});
+  return text;
+}
+
+var currentUtt=null;
+function speak(text){
+  if(!speechSynth)return;
+  speechSynth.cancel();
+  var clean=text
+    .replace(/```[\s\S]*?```/g,', code block, ')
+    .replace(/`([^`]+)`/g,'$1')
+    .replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1')
+    .replace(/#{1,3}\s+/g,'');
+  clean=mathToSpeech(clean);
+  clean=clean
+    .replace(/\|[^|\n]+/g,'')
+    .replace(/\n{2,}/g,'. ').replace(/\n/g,' ')
+    .replace(/\s{2,}/g,' ').trim();
+  if(!clean)return;
+  if(!voicesList.length){setTimeout(function(){speak(text);},800);return;}
+  currentUtt=new SpeechSynthesisUtterance(clean);
+  currentUtt.voice=selectedVoice||voicesList[0]||null;
+  currentUtt.rate=1.0;currentUtt.pitch=1.0;currentUtt.volume=1.0;
+  currentUtt.onerror=function(e){console.warn('TTS error:',e.error);};
+  var keepAlive=setInterval(function(){
+    if(!speechSynth.speaking){clearInterval(keepAlive);return;}
+    speechSynth.pause();speechSynth.resume();
+  },10000);
+  currentUtt.onend=function(){clearInterval(keepAlive);};
+  setTimeout(function(){speechSynth.speak(currentUtt);},50);
+}
+
+// ── MIC BUTTON ──────────────────────────────────────────
+elMic.onclick=function(){
+  if(isRecording) stopRecording();
+  else startRecording();
+};
+
+function startRecording(){
+  if(isRecording)return;
+  speechSynth&&speechSynth.cancel();
+  isRecording=true;
+  setMicUI(true);
+  elTxt.value='';
+  elTxt.style.height='auto';
+  if(useWhisper) startWhisper();
+  else startWebSpeech();
+}
+
+function stopRecording(){
+  if(!isRecording)return;
+  isRecording=false;
+  setMicUI(false);
+  if(useWhisper) stopWhisper();
+  else stopWebSpeech();
+}
+
+function setMicUI(on){
+  if(on){
+    elMic.classList.add('recording');
+    elVStat.classList.add('show');
+    elVSText.textContent=useWhisper?'Recording… tap stop when done':'Listening… speak now';
+    elStatus.textContent='Listening…';
+    elTxt.placeholder='Listening…';
+  } else {
+    elMic.classList.remove('recording');
+    elVStat.classList.remove('show');
+    elTxt.placeholder='Ask anything… or tap 🎙️';
+  }
+}
+
+// ── WEB SPEECH (Desktop Chrome/Edge) ────────────────────
+function startWebSpeech(){
+  recognition=new SpeechRec();
+  recognition.continuous=true;
+  recognition.interimResults=true;
+  recognition.lang='en-US';
+  recognition.onresult=function(e){
+    var full='',interim='';
+    for(var i=0;i<e.results.length;i++){
+      if(e.results[i].isFinal) full+=e.results[i][0].transcript;
+      else interim+=e.results[i][0].transcript;
+    }
+    elTxt.value=full+interim;
+    elTxt.style.height='auto';
+    elTxt.style.height=Math.min(elTxt.scrollHeight,110)+'px';
+    elVSText.textContent='Hearing: "'+elTxt.value.slice(-50)+'"';
+  };
+  recognition.onerror=function(e){
+    stopRecording();
+    if(e.error==='not-allowed') showToast('Microphone permission denied','er');
+    else if(e.error!=='aborted') showToast('Voice error: '+e.error,'er');
+  };
+  recognition.onend=function(){if(isRecording){try{recognition.start();}catch(ex){}}};
+  try{recognition.start();}
+  catch(ex){showToast('Could not start voice: '+ex.message,'er');isRecording=false;setMicUI(false);}
+}
+function stopWebSpeech(){
+  elStatus.textContent='Ready for voice';
+  try{if(recognition)recognition.stop();}catch(ex){}
+  setTimeout(function(){if(elTxt.value.trim())sendMsg(true);},200);
+}
+
+// ── WHISPER via MediaRecorder (Mobile + fallback) ────────
+function startWhisper(){
+  // Check if getUserMedia is available at all
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    isRecording=false;setMicUI(false);
+    showPermissionHelp('Voice recording is not supported in this browser. Try Chrome or Safari.');
+    return;
+  }
+  // IMPORTANT: Keep constraints minimal — iOS Safari and many Android browsers
+  // reject specific constraints like sampleRate and throw NotAllowedError/OverconstrainedError.
+  // Just request basic audio and let the browser decide the format.
+  navigator.mediaDevices.getUserMedia({audio:true,video:false})
+  .then(function(stream){
+    audioChunks=[];
+    // Detect best mime type — iOS Safari only supports audio/mp4
+    var mime='';
+    var types=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
+    for(var i=0;i<types.length;i++){
+      try{
+        if(MediaRecorder.isTypeSupported(types[i])){ mime=types[i]; break; }
+      }catch(ex){}
+    }
+    try{
+      mediaRecorder = mime ? new MediaRecorder(stream,{mimeType:mime}) : new MediaRecorder(stream);
+    }catch(ex){
+      mediaRecorder=new MediaRecorder(stream);
+    }
+    mime=mediaRecorder.mimeType||mime||'audio/webm';
+    mediaRecorder._mime=mime;
+    mediaRecorder.ondataavailable=function(e){if(e.data&&e.data.size>0)audioChunks.push(e.data);};
+    mediaRecorder.onstop=function(){
+      stream.getTracks().forEach(function(t){t.stop();});
+      if(!isRecording) transcribeWhisper(audioChunks,mediaRecorder._mime);
+    };
+    mediaRecorder.start(300);
+    elVSText.textContent='🔴 Recording… tap mic again to stop';
+  })
+  .catch(function(err){
+    isRecording=false;setMicUI(false);
+    console.error('Mic error:',err.name,err.message);
+    if(err.name==='NotAllowedError'||err.name==='PermissionDeniedError'){
+      showPermissionHelp(null);
+    } else if(err.name==='NotFoundError'||err.name==='DevicesNotFoundError'){
+      showToast('No microphone found on this device.','er');
+    } else if(err.name==='NotSupportedError'||err.name==='TypeError'){
+      showToast('Voice not supported in this browser. Try Chrome.','er');
+    } else {
+      showToast('Mic error: '+err.name+'. Try again.','er');
+    }
+  });
+}
+
+// Shows a clear step-by-step modal for permission issues
+function showPermissionHelp(customMsg){
+  var existing=document.getElementById('permhelp');
+  if(existing) existing.remove();
+  var isIOS_=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var isAndroid_=/Android/i.test(navigator.userAgent);
+  var steps='';
+  if(isIOS_){
+    steps='<b>On iPhone/iPad:</b><br>'
+      +'1. Open <b>Settings</b> app<br>'
+      +'2. Scroll to <b>Safari</b> (or your browser)<br>'
+      +'3. Tap <b>Microphone</b> → set to <b>Allow</b><br>'
+      +'4. Come back here and tap the mic again';
+  } else if(isAndroid_){
+    steps='<b>On Android:</b><br>'
+      +'1. Tap the <b>lock icon</b> in the browser address bar<br>'
+      +'2. Tap <b>Permissions</b> → <b>Microphone</b> → Allow<br>'
+      +'3. Refresh the page and tap the mic again<br><br>'
+      +'<b>Or:</b> Go to <b>Settings → Apps → Browser → Permissions → Microphone → Allow</b>';
+  } else {
+    steps='Click the <b>lock icon</b> in your browser address bar,<br>then set <b>Microphone</b> to <b>Allow</b> and refresh.';
+  }
+  var ov=document.createElement('div');ov.className='mov';ov.id='permhelp';
+  ov.innerHTML='<div class="mbox">'
+    +'<h2>🎙️ Mic Permission Needed</h2>'
+    +'<p style="color:var(--txt);font-size:12px;line-height:1.9;margin-bottom:14px;">'
+    +(customMsg||('Raven needs microphone access to hear you. '
+      +'Your browser has blocked it. Here\'s how to fix it:<br><br>'+steps))
+    +'</p>'
+    +'<div class="mbtns"><button class="sbtn pri" id="permok">Got it</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#permok').onclick=function(){ov.remove();};
+}
+
+function stopWhisper(){
+  elStatus.textContent='Transcribing…';
+  elVStat.classList.add('show');
+  elVSText.textContent='Processing…';
+  if(mediaRecorder&&mediaRecorder.state!=='inactive') mediaRecorder.stop();
+}
+
+function transcribeWhisper(chunks,mime){
+  if(!chunks.length){elStatus.textContent='Ready for voice';elVStat.classList.remove('show');return;}
+  var ext=mime.includes('ogg')?'ogg':mime.includes('mp4')?'mp4':'webm';
+  var blob=new Blob(chunks,{type:mime});
+  var fd=new FormData();
+  fd.append('file',blob,'audio.'+ext);
+  fd.append('model','whisper-large-v3-turbo');
+  fd.append('response_format','json');
+  fetch(GROQ_STT,{method:'POST',headers:{'Authorization':'Bearer '+GROQ_KEY},body:fd})
+  .then(function(r){return r.json();})
+  .then(function(data){
+    elVStat.classList.remove('show');
+    elStatus.textContent='Ready for voice';
+    var text=data.text&&data.text.trim();
+    if(!text){showToast("Couldn't hear anything. Try again.",'in');return;}
+    elTxt.value=text;
+    elTxt.style.height='auto';
+    elTxt.style.height=Math.min(elTxt.scrollHeight,110)+'px';
+    sendMsg(true);
+  })
+  .catch(function(err){
+    elVStat.classList.remove('show');
+    elStatus.textContent='Ready for voice';
+    showToast('Transcription failed. Try again.','er');
+    console.error('Whisper:',err);
+  });
+}
+
+// ── WIRING ──────────────────────────────────────────────
+document.getElementById('hbtn').onclick=openSB;
+document.getElementById('sov').onclick=closeSB;
+document.getElementById('btn-new').onclick=function(){closeSB();newChat();};
+document.getElementById('btn-save').onclick=function(){closeSB();saveChat();};
+document.getElementById('btn-clear').onclick=function(){closeSB();clearChat();};
+document.getElementById('btn-new-top').onclick=newChat;
+document.getElementById('imgbtn').onclick=function(){elFile.click();};
+elSend.onclick=function(){sendMsg(false);};
+elFile.onchange=handleFiles;
+elTxt.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg(false);}};
+elTxt.oninput=function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';};
+elTxt.onfocus=function(){setTimeout(function(){elMsgs.scrollTop=elMsgs.scrollHeight;},350);};
+document.querySelectorAll('.chip').forEach(function(c){c.onclick=function(){qs(this.getAttribute('data-q'));};});
+renderHist();
+
+// ── SIDEBAR ─────────────────────────────────────────────
+function openSB(){document.getElementById('sb').classList.add('on');document.getElementById('sov').classList.add('on');}
+function closeSB(){document.getElementById('sb').classList.remove('on');document.getElementById('sov').classList.remove('on');}
+
+// ── PERSIST ─────────────────────────────────────────────
+function persist(){try{localStorage.setItem('rv6',JSON.stringify(convos));}catch(e){}}
+
+// ── HISTORY ─────────────────────────────────────────────
+function renderHist(){
+  var ids=Object.keys(convos).sort(function(a,b){return Number(b)-Number(a);});
+  if(!ids.length){elHist.innerHTML='<div style="padding:10px 14px;font-size:11px;color:var(--dim)">No saved chats yet.</div>';return;}
+  elHist.innerHTML='';
+  ids.forEach(function(id){
+    var d=document.createElement('div');d.className='hi'+(id===curId?' act':'');
+    d.innerHTML='<span class="hiname">'+esc(convos[id].name||'Untitled')+'</span><span class="hidel">✕</span>';
+    d.querySelector('.hidel').onclick=function(e){e.stopPropagation();delConvo(id);};
+    d.onclick=function(){closeSB();loadConvo(id);};
+    elHist.appendChild(d);
+  });
+}
+function loadConvo(id){
+  if(busy)return;curId=id;
+  msgs=(convos[id].msgs||[]).map(function(m){var c=Object.assign({},m);delete c._img;return c;});
+  elTitle.textContent=convos[id].name||'Untitled';
+  renderAll();renderHist();pend=[];elPrev.innerHTML='';
+}
+function delConvo(id){delete convos[id];persist();if(curId===id)newChat();else renderHist();}
+
+// ── CHAT ACTIONS ────────────────────────────────────────
+function newChat(){
+  if(busy)return;curId=null;msgs=[];pend=[];
+  elPrev.innerHTML='';elTitle.textContent='Raven AI';
+  elTxt.value='';elTxt.style.height='auto';
+  speechSynth&&speechSynth.cancel();
+  showWelcome();renderHist();
+}
+function clearChat(){
+  if(busy)return;msgs=[];pend=[];elPrev.innerHTML='';
+  if(curId&&convos[curId]){convos[curId].msgs=[];persist();}
+  speechSynth&&speechSynth.cancel();
+  showWelcome();showToast('Chat cleared','in');
+}
+function saveChat(){
+  if(!msgs.length){showToast('Nothing to save yet!','in');return;}
+  if(!curId){curId=Date.now().toString();convos[curId]={name:'Untitled',msgs:msgs};}
+  var ex=(convos[curId]&&convos[curId].name!=='Untitled')?convos[curId].name:'';
+  var ov=document.createElement('div');ov.className='mov';
+  ov.innerHTML='<div class="mbox"><h2>Save Chat</h2><p>Give this conversation a name.</p>'
+    +'<input id="mni" type="text" placeholder="e.g. Calculus Notes" value="'+esc(ex)+'">'
+    +'<div class="mbtns"><button class="sbtn" id="mcx">Cancel</button><button class="sbtn pri" id="mok">Save</button></div></div>';
+  document.body.appendChild(ov);
+  var inp=ov.querySelector('#mni');inp.focus();
+  ov.querySelector('#mcx').onclick=function(){ov.remove();};
+  ov.querySelector('#mok').onclick=function(){
+    var name=inp.value.trim()||'Untitled';ov.remove();
+    convos[curId].name=name;convos[curId].msgs=msgs;
+    persist();elTitle.textContent=name;renderHist();showToast('Saved!','ok');
+  };
+  inp.onkeydown=function(e){if(e.key==='Enter')ov.querySelector('#mok').click();};
+}
+
+// ── RENDER ──────────────────────────────────────────────
+function showWelcome(){
+  elMsgs.innerHTML='<div id="welcome">'
+    +'<div class="wbadge"><div class="wbadge-dot"></div>Voice-first chat · Powered by Groq</div>'
+    +'<div class="wt">Speak. <span class="accent">Raven</span> answers.</div>'
+    +'<div class="wd">A refined dark-mode voice assistant. Tap the mic, speak your question, and hear Raven respond in real time.</div>'
+    +'<div class="wfeatures">'
+    +'<div class="wfeat"><span class="wfeat-icon">〰️</span><div class="wfeat-title">Streaming</div><div class="wfeat-desc">Audio plays while text appears.</div></div>'
+    +'<div class="wfeat"><span class="wfeat-icon">🔒</span><div class="wfeat-title">Reliable</div><div class="wfeat-desc">Works on all devices.</div></div>'
+    +'<div class="wfeat"><span class="wfeat-icon">🎙️</span><div class="wfeat-title">Simple</div><div class="wfeat-desc">One mic. No clutter.</div></div>'
+    +'</div>'
+    +'<div class="chips">'
+    +'<div class="chip" data-q="Solve step by step: integrate x cubed plus 2x">∫ Calculus</div>'
+    +'<div class="chip" data-q="Explain quantum entanglement simply">⚛ Quantum</div>'
+    +'<div class="chip" data-q="Write Python merge sort with explanation">🐍 Python</div>'
+    +'<div class="chip" data-q="Main causes of World War I">📜 History</div>'
+    +'<div class="chip" data-q="Explain the Riemann Hypothesis">π Riemann</div>'
+    +'<div class="chip" data-q="Newton\'s 3 laws with real examples">🔭 Physics</div>'
+    +'</div>'
+    +'<div class="wc">Created by Saandeep Kishore · Powered by Groq</div>'
+    +'</div>';
+  elMsgs.querySelectorAll('.chip').forEach(function(c){c.onclick=function(){qs(this.getAttribute('data-q'));};});
+}
+function renderAll(){
+  elMsgs.innerHTML='';if(!msgs.length){showWelcome();return;}
+  msgs.forEach(function(m){addBubble(m,false);});elMsgs.scrollTop=elMsgs.scrollHeight;
+}
+function addBubble(m,sc,fromVoice){
+  if(sc===undefined)sc=true;
+  var w=document.getElementById('welcome');if(w)w.remove();
+  var wrap=document.createElement('div');wrap.className='msg '+(m.role==='user'?'u':'b');
+  var av=document.createElement('div');av.className='av';av.textContent=m.role==='user'?'U':'R';
+  var bub=document.createElement('div');bub.className='bub';
+  if(m.role==='user'){
+    if(m.imgs&&m.imgs.length) m.imgs.forEach(function(s){var i=document.createElement('img');i.src=s;i.style.cssText='max-width:120px;max-height:120px;border-radius:8px;display:block;margin-bottom:6px;object-fit:cover;';bub.appendChild(i);});
+    if(m.text){var p=document.createElement('p');p.style.whiteSpace='pre-wrap';p.textContent=m.text;bub.appendChild(p);}
+    if(fromVoice){var vt=document.createElement('span');vt.className='voice-tag';vt.textContent='🎙️ Voice';bub.appendChild(vt);}
+  } else {
+    bub.innerHTML=renderMD(m.text||'');
+    if(typeof renderMathInElement!=='undefined'){
+      try{renderMathInElement(bub,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}],throwOnError:false,trust:true});}catch(e){}
+    }
+  }
+  wrap.appendChild(av);wrap.appendChild(bub);elMsgs.appendChild(wrap);
+  if(sc)elMsgs.scrollTop=elMsgs.scrollHeight;
+}
+function showTyping(){
+  var w=document.getElementById('welcome');if(w)w.remove();
+  var d=document.createElement('div');d.className='msg b';d.id='typi';
+  d.innerHTML='<div class="av">R</div><div class="bub"><div class="typing"><span></span><span></span><span></span></div></div>';
+  elMsgs.appendChild(d);elMsgs.scrollTop=elMsgs.scrollHeight;return d;
+}
+
+// ── MARKDOWN ────────────────────────────────────────────
+function renderMD(r){
+  var t=r.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  t=t.replace(/```[\w]*\n?([\s\S]*?)```/g,function(_,c){return '<pre><code>'+c.trim()+'</code></pre>';});
+  t=t.replace(/`([^`\n]+)`/g,'<code>$1</code>');
+  t=t.replace(/((?:^\|.+\|\s*\n)+)/gm,function(block){
+    var lines=block.trim().split('\n');if(lines.length<2)return block;
+    var html='<div class="tbl-wrap"><table>';var first=true;
+    lines.forEach(function(line){
+      line=line.trim();if(!line.startsWith('|'))return;
+      if(/^\|[\s\-\|:]+\|$/.test(line))return;
+      var cells=line.split('|').slice(1,-1);
+      if(first){html+='<thead><tr>';cells.forEach(function(c){html+='<th>'+c.trim()+'</th>';});html+='</tr></thead><tbody>';first=false;}
+      else{html+='<tr>';cells.forEach(function(c){html+='<td>'+c.trim()+'</td>';});html+='</tr>';}
+    });
+    return html+'</tbody></table></div>';
+  });
+  t=t.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+  t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  t=t.replace(/\*([^*\n]+?)\*/g,'<em>$1</em>');
+  t=t.replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  t=t.replace(/^\d+\.\s+(.+)$/gm,'<li>$1</li>').replace(/^[-*]\s+(.+)$/gm,'<li>$1</li>');
+  t=t.split(/\n{2,}/).map(function(b){
+    var s=b.trim();if(!s)return '';
+    if(/^<(h[1-3]|pre|li|div)/.test(s))return s;
+    return '<p>'+s.replace(/\n/g,'<br>')+'</p>';
+  }).join('');return t;
+}
+
+// ── SEND ────────────────────────────────────────────────
+function qs(text){elTxt.value=text;sendMsg(false);}
+function sendMsg(fromVoice){
+  if(busy)return;
+  var text=elTxt.value.trim();
+  if(!text&&!pend.length)return;
+  if(!curId){curId=Date.now().toString();convos[curId]={name:'New Conversation',msgs:[]};}
+  if(pend.length>5)pend=pend.slice(0,5);
+  var imgData=pend.map(function(p){return{b64:p.b64,mime:p.mime};});
+  var um={role:'user',text:text,imgs:pend.map(function(p){return p.url;}),_img:imgData};
+  msgs.push(um);pend=[];elPrev.innerHTML='';
+  elTxt.value='';elTxt.style.height='auto';
+  addBubble(um,true,fromVoice);var ty=showTyping();
+  busy=true;elSend.disabled=true;elStatus.textContent='Thinking…';
+  callAPI(imgData).then(function(reply){
+    ty.remove();var bm={role:'bot',text:reply};msgs.push(bm);addBubble(bm);
+    convos[curId].msgs=msgs;persist();
+    speak(reply);
+    elStatus.textContent='Speaking…';
+    var chk=setInterval(function(){if(!speechSynth.speaking){clearInterval(chk);elStatus.textContent='Ready for voice';}},600);
+  }).catch(function(err){
+    ty.remove();var bm={role:'bot',text:'**Error:** '+(err.message||'Try again.')};msgs.push(bm);addBubble(bm);
+    convos[curId].msgs=msgs;persist();elStatus.textContent='Ready for voice';
+  }).finally(function(){busy=false;elSend.disabled=false;});
+}
+
+// ── API ─────────────────────────────────────────────────
+function callAPI(imgData){
+  var hasImg=imgData&&imgData.length>0;
+  var apiMsgs=[{role:'system',content:SYS}];
+  for(var i=0;i<msgs.length;i++){
+    var m=msgs[i];
+    if(m.role==='bot') apiMsgs.push({role:'assistant',content:m.text||''});
+    else if(hasImg&&m._img&&m._img.length){
+      var parts=[];
+      m._img.forEach(function(img){parts.push({type:'image_url',image_url:{url:'data:'+img.mime+';base64,'+img.b64}});});
+      parts.push({type:'text',text:m.text||'Describe and analyze this image in detail.'});
+      apiMsgs.push({role:'user',content:parts});
+    } else if(m.text) apiMsgs.push({role:'user',content:m.text});
+  }
+  return fetch(GROQ_URL,{method:'POST',mode:'cors',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_KEY},
+    body:JSON.stringify({model:hasImg?GROQ_VIS:GROQ_MODEL,messages:apiMsgs,temperature:0.7,max_tokens:8192})
+  }).then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+  .then(function(r){
+    if(!r.ok)throw new Error((r.d&&r.d.error&&r.d.error.message)||'API error. Try again.');
+    var txt=r.d&&r.d.choices&&r.d.choices[0]&&r.d.choices[0].message&&r.d.choices[0].message.content;
+    if(!txt)throw new Error('Empty response. Try again.');
+    return txt;
+  });
+}
+
+// ── FILE ATTACH ─────────────────────────────────────────
+function handleFiles(){
+  Array.from(elFile.files).filter(function(f){return f.type.startsWith('image/');})
+  .slice(0,5-pend.length).forEach(function(f){
+    var r=new FileReader();
+    r.onload=function(e){pend.push({b64:e.target.result.split(',')[1],mime:f.type,url:e.target.result});renderPrev();};
+    r.readAsDataURL(f);
+  });
+  elFile.value='';
+}
+function renderPrev(){
+  elPrev.innerHTML='';
+  pend.forEach(function(p,i){
+    var w=document.createElement('div');w.className='pv';
+    var img=document.createElement('img');img.className='pvimg';img.src=p.url;
+    var rm=document.createElement('button');rm.className='pvrm';rm.textContent='✕';
+    rm.onclick=function(){pend.splice(i,1);renderPrev();};
+    w.appendChild(img);w.appendChild(rm);elPrev.appendChild(w);
+  });
+}
+
+// ── UTILS ───────────────────────────────────────────────
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function showToast(msg,type){
+  var old=document.querySelector('.toast');if(old)old.remove();
+  var el=document.createElement('div');el.className='toast '+(type||'in');el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(function(){el.style.transition='opacity 0.3s';el.style.opacity='0';setTimeout(function(){el.remove();},300);},3500);
+}
+
+};
+</script>
+</body>
+</html>
